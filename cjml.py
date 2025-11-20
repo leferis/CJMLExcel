@@ -1,11 +1,20 @@
 import pandas as pd
+from datetime import datetime
+
+
 class CJML:
     def __init__(self):
         self.plannedJourney = []
         self.ActualJourney = []
+        self.user = ""
 
     def toXML(self, endUser):
-        text = "<CJML version=\"2.0\">\n"
+
+        text = "<!-- Produced by: ExcelToCJML " + "Date:" + str(datetime.now())
+        if not (self.user != ""):
+            text += " produced by: " + self.user
+        text += " -->\n"
+        text += "<CJML version=\"2.0\">\n"
         for planed in self.plannedJourney:
             text += planed.toXML()
         for actual in self.ActualJourney:
@@ -22,7 +31,7 @@ class Journey:
         self.journeyLongSummary = ""
         self.journeyPhase = JourneyPhase()
         self.journeyOperators = ""
-
+        self.creator = ""
 
 class JourneyPhase:
     def __init__(self):
@@ -41,6 +50,7 @@ class EndUserExperience:
         experienceText = ""
         experienceText += "<touchpointExperience>"
         experienceText += "<experienceDescription>{0}</experienceDescription>".format(self.experienceDescription)
+        experienceText += "<experienceRating>{0}</experienceRating>".format(self.expienceRating)
         experienceText += "</touchpointExperience>"
         return experienceText
 
@@ -66,6 +76,10 @@ class PlannedJourney(Journey):
     def addActor(self, actor):
         self.actors.append(actor)
 
+class Actor:
+    def __init__(self):
+        self.actorName = ""
+        self.IconName = ""
 
 class ActualJourney(Journey):
     def __init__(self):
@@ -88,16 +102,22 @@ class ActualJourney(Journey):
     def addActor(self, actor):
         self.actors = self.actors + actor
 
-        
     def sortActors(self, endUser):
         endUsers = []
         otherActors = []
-        for a in self.actors:
-            if a in endUser:
-                endUsers.append(a)
-            else:
-                otherActors.append(a)
+        if (isinstance(self.actors, dict)):
+            for a in self.actors.values():
+                self.assignActors(a, endUser, endUsers, otherActors)
+        else:
+            for a in self.actors:
+                self.assignActors(a, endUser, endUsers, otherActors)
         self.actors = endUsers + otherActors
+
+    def assignActors(self, a, endUser,  endUsers, otherActors):
+        if a in endUser:
+            endUsers.append(a)
+        else:
+            otherActors.append(a)
 
     def toXML(self, endUser):
         self.sortActors(endUser)
@@ -105,7 +125,7 @@ class ActualJourney(Journey):
         test += "<journeyID>AJ{0}</journeyID>\n".format(self.journeyID)
         test += "<journeyTitle>{0}</journeyTitle>\n".format(self.journeyTitle) if self.journeyTitle != "" else ""
         test += "<plannedReference>PJ1</plannedReference>" # delete later
-        if len(self.Phases) >0:
+        if len(self.Phases) > 0:
             test += "<journeyPhases>\n"
             for phase in self.Phases:
                 test += "<journeyPhase phaseID =\" "+phase+"\">\n"
@@ -120,9 +140,13 @@ class ActualJourney(Journey):
         userList = ""
         for actor in self.actors:
             if actor in endUser:
-                userList = "<endUser actorID =\"{0}\"/>\n".format(actor) + userList
+                if len(actor) == 2:
+                    userList = "<!-- {0} -->\n".format(actor[1]) + userList
+                userList = "<endUser actorID =\"{0}\"/>\n".format(actor[0] if len(actor) == 2 else actor) + userList
             else:
-                userList = userList + "<serviceProvider actorID =\"{0}\"/>\n".format(actor)
+                if len(actor) == 2:
+                    userList = userList + "<!-- {0} -->\n".format(actor[1])
+                userList = userList + "<serviceProvider actorID =\"{0}\"/>\n".format(actor[0] if len(actor) == 2 else actor)
 
         test += userList
         test += "</actors>\n"
@@ -209,6 +233,7 @@ class ActualCommunicationPoint(ActualTouchPoint):
         self.phase = ""
 
     def toXML(self, index):
+        self.resolveTouchpointId(index)
         communicationPoint = "<actualCommunicationPoint>\n"
         communicationPoint += "<touchpointID>{0}</touchpointID>\n".format(self.TouchPointID if not pd.isna(self.TouchPointID) else index)
         communicationPoint += "<belongsTo phaseIDref =\""+ self.phase+"\"></belongsTo>"
@@ -222,6 +247,12 @@ class ActualCommunicationPoint(ActualTouchPoint):
         communicationPoint += "</actualCommunicationPoint>\n"
         return communicationPoint
 
+    def resolveTouchpointId(self, index):
+        if pd.isna(self.TouchPointID):
+            self.TouchPointID = index
+        if self.Devation == True:
+            self.TouchPointID = "D" + str(index)
+
 
 class Initiator:
     def __init__(self):
@@ -230,7 +261,7 @@ class Initiator:
 
     def toXML(self):
         text = "<initiator>\n"
-        text += "<refersTo actorIDref=\"{0}\"/>\n".format(self.refersTo)
+        text += "<refersTo actorIDref=\"{0}\"/>\n".format(self.refersTo[0] if len(self.refersTo) == 2 else self.refersTo)
         text += "<initiatorLabel>{0}</initiatorLabel>\n".format(self.initatorLabel if not pd.isnull(self.initatorLabel) else 'Sending') 
         text += "</initiator>\n"
         return text
@@ -244,7 +275,7 @@ class Receiver:
     def toXML(self):
         nl = "\n"
         text = "<receiver>\n"
-        text += f'''<refersTo actorIDref="{self.refersTo}"/>{nl}'''
+        text += f'''<refersTo actorIDref="{self.refersTo[0] if len(self.refersTo) == 2 else self.refersTo}"/>{nl}'''
         text += "<receiverLabel>{0}</receiverLabel>\n".format(self.receiversLabel if not pd.isnull(self.receiversLabel) else 'Receiving') 
         text += "</receiver>\n"
         return text

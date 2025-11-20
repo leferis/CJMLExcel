@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from dateutil import parser
 import tkinter as tk
@@ -8,6 +9,7 @@ import numpy as np
 from tkinter import messagebox
 from tkinter.messagebox import askyesno
 from dragAndDrop import Drag_and_Drop_Listbox
+#from icons import IconSelect
 from meniu import Meniu
 
 
@@ -21,15 +23,30 @@ goFoward = True
 skipGruping = False
 tempActors = []
 action = ""
+hasActivatedGrouping = False
+fileName = ""
+Icons = []
+
+
+def checkifCreatorProvided(dataframe: pd.DataFrame):
+    return dataframe.head(1).iloc[0, 0] in ["Yes", "No", np.nan]
+
+
+def dropCreatorProvided(dataframe: pd.DataFrame):
+    return dataframe.drop(axis=0, index=[6])
+
 
 def showSheetWindow(excelFile, sheet):
     global actorsList
     if goFoward:
-            dataFrame = pd.read_excel(excelFile, sheet_name=sheet)
-            print(dataFrame)
-            touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5])
+        dataFrame = pd.read_excel(excelFile, sheet_name=sheet)
+        touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5])
+        if checkifCreatorProvided(touchPoints) is True:
+            touchPoints = dropCreatorProvided(touchPoints)
             touchPoints.rename(columns=stripSeries(dataFrame.iloc[5]), inplace=True)
-            actorsList = getActorsList(touchPoints)
+        else:
+            touchPoints.rename(columns=stripSeries(dataFrame.iloc[6]), inplace=True)
+        actorsList = getActorsList(touchPoints)
 
 
 def showActorGroupingWindow(sheet):
@@ -44,9 +61,15 @@ def showActorGroupingWindow(sheet):
 
 
 def checkIncludeFlag(text):
-    if(pd.isna(text)):
+    if pd.isna(text):
         return True
-    elif str.upper(text) == 'NO' or str.upper(text) == 'NEI' or str.upper(text) == 'N' or str.upper(text) == 'FALSE' or CheckIfNumber(text):
+    elif (
+        str.upper(text) == "NO"
+        or str.upper(text) == "NEI"
+        or str.upper(text) == "N"
+        or str.upper(text) == "FALSE"
+        or CheckIfNumber(text)
+    ):
         return False
     else:
         return True
@@ -63,28 +86,43 @@ def CheckIfNumber(text):
 
 
 def checkDevationFlag(text):
-    if(pd.isna(text) or text is float):
+    if pd.isna(text) or text is float:
         return False
-    elif str.upper(text) == 'NO' or str.upper(text) == 'NEI' or str.upper(text) == 'N' or str.upper(text) == 'FALSE' or (CheckIfNumber(text)):
+    elif (
+        str.upper(text) == "NO"
+        or str.upper(text) == "NEI"
+        or str.upper(text) == "N"
+        or str.upper(text) == "FALSE"
+        or (CheckIfNumber(text))
+    ):
         return False
     else:
         return True
 
+
 def error(sheet):
-    messagebox.showerror('Excel fillment error', 'Enduser provided in "'+ sheet+'" sheet, field A3, label "End-user ID", does not exist in receiver (column I) or initiator (column J) fields')
+    messagebox.showerror(
+        "Excel fillment error",
+        'Enduser provided in "'
+        + sheet
+        + '" sheet, field A3, label "End-user ID", does not exist in receiver (column I) or initiator (column J) fields',
+    )
 
 
 def stripSeries(dataFrame):
     return dataFrame.apply(lambda x: x.strip() if isinstance(x, str) else x)
 
+
 def change(value):
     global action
     action = value
 
+
 def readExcel(filePath):
-    global journeySheets, endUser, loop, skipGruping, actorsList, userMapping, action
+    global journeySheets, endUser, loop, skipGruping, actorsList, userMapping, action, fileName, Icons
     id = 1
     excelFile = pd.ExcelFile(filePath)
+    fileName = os.path.splitext(os.path.basename(filePath))[0]
     selectSheets(excelFile.sheet_names)
     if goFoward:
         XMlList = cjml.CJML()
@@ -97,29 +135,52 @@ def readExcel(filePath):
             else:
                 for actor in actorsList:
                     userMapping[actor] = actor
-            endUser.append( str.capitalize(str.lower(dataFrame['Unnamed: 3'][0])))
-            if not str.capitalize(str.lower(dataFrame['Unnamed: 3'][0])) in actorsList:
+            endUser.append(str.capitalize(str.lower(dataFrame["Unnamed: 3"][0])))
+            if not str.capitalize(str.lower(dataFrame["Unnamed: 3"][0])) in actorsList:
                 error(sheet)
                 return
-            touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5]).dropna(how='all')
-            touchPoints.rename(columns=stripSeries(dataFrame.iloc[5]), inplace=True)
+            touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5]).dropna(
+                how="all"
+            )
+            # if action == "icons" or action == "sort":
+            #     IconSelect(userMapping)
+            if checkifCreatorProvided(touchPoints) is False:
+                touchPoints = dropCreatorProvided(touchPoints)
+                touchPoints.rename(columns=stripSeries(dataFrame.iloc[6]), inplace=True)
+            else:
+                touchPoints.rename(columns=stripSeries(dataFrame.iloc[5]), inplace=True)
             journey = extractJourneyInfo(dataFrame, id)
-            initiator = touchPoints.columns.get_loc('Actor who initiated' )
-            receiver = touchPoints.columns.get_loc('Actor who received')
-            tclist = np.array([str(elem).upper() if isinstance(elem, str) else elem for elem in  touchPoints.iloc[:, initiator].values])
-            tclist2 = np.array([str(elem).upper() if isinstance(elem, str) else elem for elem in  touchPoints.iloc[:, receiver].values])
+            initiator = touchPoints.columns.get_loc("Actor who initiated")
+            receiver = touchPoints.columns.get_loc("Actor who received")
+            tclist = np.array(
+                [
+                    str(elem).upper() if isinstance(elem, str) else elem
+                    for elem in touchPoints.iloc[:, initiator].values
+                ]
+            )
+            tclist2 = np.array(
+                [
+                    str(elem).upper() if isinstance(elem, str) else elem
+                    for elem in touchPoints.iloc[:, receiver].values
+                ]
+            )
             for value, (key, value) in enumerate(userMapping.items()):
-                if value not in journey.actors and (str.upper(key) in tclist or str.upper(key) in tclist2):
+                if value not in journey.actors and (
+                    str.upper(key) in tclist or str.upper(key) in tclist2
+                ):
                     journey.actors.append(value)
             for index2, line in touchPoints.iterrows():
-                if checkIncludeFlag(line['Include']) and not pd.isnull(line['Actor who initiated']):
+                if checkIncludeFlag(line["Include"]) and not pd.isnull(
+                    line["Actor who initiated"]
+                ):
                     touchPoint = parseTouchPoint(line, userMapping)
                     journey.addTouchPoints(touchPoint)
             journey.Phases = list(set(PhaseList))
             XMlList.ActualJourney.append(journey)
+            XMlList.user = journey.creator
             id = id + 1
             loop = True
-            if action == "sort" or action == "group":
+            if action == "sort" or action == "group" or action == "icons":
                 journey = sortUser(journey)
         saveXML(XMlList)
 
@@ -127,34 +188,73 @@ def readExcel(filePath):
 def sortUser(journey):
     global tempActors
     root = tk.Tk()
+    userMapping = {}
     listbox = Drag_and_Drop_Listbox(root)
     sortUsersWindow(journey, root, listbox)
-    journey.actors = tempActors
+    for value in journey.actors:
+        for actor in tempActors:
+            if len(value) == 2 and actor == value[0]:
+                userMapping[actor] = value
+                break
+            elif actor == value:
+                userMapping[actor] = value
+                break
+    journey.actors = userMapping
     return journey
 
 
 def sortUsersWindow(journey, root, listbox):
+    tk.Label(
+        root,
+        text="Please sort the actors in the order they appear in the journey using drag-and-drop.",
+        font=("Arial", 10),
+    ).pack(pady=10)
     for i, name in enumerate(journey.actors):
-        listbox.insert(tk.END, name)
+        if len(name) == 2:
+            listbox.insert(tk.END, name[0])
+        else:
+            listbox.insert(tk.END, name)
         if i % 2 == 0:
             listbox.selection_set(i)
-    bSkip = tk.Button(root, text='Finish ordering', width=25, command=lambda: on_closings(root, listbox))
+    bSkip = tk.Button(
+        root,
+        text="Finish ordering",
+        width=25,
+        command=lambda: on_closings(root, listbox),
+    )
     listbox.pack(fill=tk.BOTH, expand=True)
     bSkip.pack(fill=tk.BOTH, expand=True)
+    listbox.bind("<<ListboxSelect>>", change_Colors(listbox))
+    root.attributes('-topmost', True)
+    root.update()
+    root.attributes('-topmost', False)
     root.mainloop()
 
 
+def change_Colors(listbox):
+    for i in range(listbox.size()):
+        if i % 2 == 0:  # Even indices
+            listbox.itemconfig(i, bg="lightblue")
+        else:  # Odd indices
+            listbox.itemconfig(i, bg="lightyellow")
+
+
 def saveXML(cjml: cjml.CJML):
-    global endUser
-    with open('journey.xml', "w", encoding='utf-8') as file:
+    global endUser, fileName
+    current_datetime = datetime.now()
+    formatted_date = current_datetime.strftime("%Y_%m_%d")
+    with open(f"{formatted_date}_{fileName}.xml", "w", encoding="utf-8") as file:
         file.write(cjml.toXML(endUser))
+    tk.messagebox.showinfo("Success", "The XML file has been created successfully!")
 
 
 def organizeUsers(sheet):
     window = tk.Tk(screenName="Select users")
 
     window.title("Create user mapping " + sheet)
-    label = tk.Label(window, text="Select users from sheet:"""+ sheet +" "" and give general name for them", font=("Arial", 14))
+    label = tk.Label(
+        window, text="Please provide user name when grouping", font=("Arial", 14)
+    )
     label.grid(row=0, columnspan=3, column=0)
 
     labelName = tk.Label(window, text="User generic name:")
@@ -171,18 +271,34 @@ def organizeUsers(sheet):
 
     frame.grid(row=3, column=1, padx=(20, 20), sticky="nsew", columnspan=1)
 
-    b = tk.Button(window, text='Continue', width=25, command=lambda: saveActors(options, options2, text, window))
+    b = tk.Button(
+        window,
+        text="Continue",
+        width=25,
+        command=lambda: saveActors(options, options2, text, window),
+    )
     b.grid(row=4, columnspan=6, sticky="nsew", column=0, padx=50, pady=10)
 
-    bSkip = tk.Button(window, text='Skip all grouping', width=25, command=lambda:breakGrouping(window) )
-    bSkip.grid(row=5, columnspan=6, sticky="nsew", column=0, padx=50, pady=10)
+    if hasActivatedGrouping == False:
+        bSkip = tk.Button(
+            window,
+            text="Skip all grouping",
+            width=25,
+            command=lambda: breakGrouping(window),
+        )
+        bSkip.grid(row=5, columnspan=6, sticky="nsew", column=0, padx=50, pady=10)
     window.protocol("WM_DELETE_WINDOW", lambda: on_closing(window))
+    window.attributes('-topmost', True)
+    window.update()
+    window.attributes('-topmost', False)
     window.mainloop()
 
 
 def breakGrouping(window):
     global skipGruping, loop
-    answer = askyesno(title='confirmation', message='Are you sure that you want to skip grouping?')
+    answer = askyesno(
+        title="confirmation", message="Are you sure that you want to skip the grouping?"
+    )
     if answer:
         skipGruping = True
         loop = False
@@ -191,7 +307,9 @@ def breakGrouping(window):
 
 def on_closing(window):
     global goFoward
-    answer = askyesno(title='confirmation', message='Are you sure that you want to close window?')
+    answer = askyesno(
+        title="confirmation", message="Are you sure that you want to close the window?"
+    )
     if answer:
         goFoward = False
     window.destroy()
@@ -199,44 +317,75 @@ def on_closing(window):
 
 def on_closings(window, lists):
     global tempActors
-    answer = askyesno(title='confirmation', message='Are you sure that you want to close window?')
+    answer = askyesno(
+        title="confirmation", message="Are you sure that you want to close the window?"
+    )
     if answer:
-        tempActors = lists.get(0, 'end')
+        tempActors = lists.get(0, "end")
     window.destroy()
 
 
 def selectSheets(sheets):
     global journeySheets
-    journeySheets = [e for e in sheets if e not in ('Log', 'User Guide', 'Channels', 'Actors', 'Phases', 'Simplifications', 'About', 'Screenshots', 'Configure', 'Input through "web form"')]
+    journeySheets = [
+        e
+        for e in sheets
+        if e
+        not in (
+            "Log",
+            "User Guide",
+            "Channels",
+            "Actors",
+            "Phases",
+            "Simplifications",
+            "About",
+            "Screenshots",
+            "Configure",
+            'Input through "web form"',
+        )
+    ]
 
 
 def createBoxes(window, frame, rowLocation):
     options = tk.Listbox(window)
 
     options2 = tk.Listbox(window)
-    moveToRight = tk.Button(frame, text="→", width=10, command=lambda: moveElementFormOneBoxToOther(options, options2))
-    moveToLeft = tk.Button(frame, text="←", width=10, command=lambda: moveElementFormOneBoxToOther(options2, options))
+    moveToRight = tk.Button(
+        frame,
+        text="→",
+        width=10,
+        command=lambda: moveElementFormOneBoxToOther(options, options2),
+    )
+    moveToLeft = tk.Button(
+        frame,
+        text="←",
+        width=10,
+        command=lambda: moveElementFormOneBoxToOther(options2, options),
+    )
 
     moveToRight.pack(side="top", expand=True)
     moveToLeft.pack(side="top", expand=True)
 
-    options.bind('<Double-1>', lambda x: moveElementFormOneBoxToOther(options, options2)) 
-    options2.bind('<Double-1>', lambda x: moveElementFormOneBoxToOther(options2, options)) 
+    options.bind(
+        "<Double-1>", lambda x: moveElementFormOneBoxToOther(options, options2)
+    )
+    options2.bind(
+        "<Double-1>", lambda x: moveElementFormOneBoxToOther(options2, options)
+    )
 
     options.grid(row=rowLocation, column=0, sticky="nsew", padx=10, pady=10)
     options2.grid(row=rowLocation, column=2, sticky="nsew", padx=10, pady=10)
     return options, options2
 
 
-
-
 def saveActors(options: tk.Listbox, options2: tk.Listbox, input: tk.Text, window):
-    global userMapping, actorsList, loop
+    global userMapping, actorsList, loop, hasActivatedGrouping
     fieldIsEmpty = ""
-    inputExists = input.get('1.0', 'end-1c') != ""
-    userSelected = options2.size()> 0
+    hasActivatedGrouping = True
+    inputExists = input.get("1.0", "end-1c") != ""
+    userSelected = options2.size() > 0
 
-    if not inputExists and  userSelected:
+    if not inputExists and userSelected:
         fieldIsEmpty = "No name for user was given. Please assign the name for the user"
 
     if inputExists and not userSelected:
@@ -244,23 +393,26 @@ def saveActors(options: tk.Listbox, options2: tk.Listbox, input: tk.Text, window
 
     if fieldIsEmpty == "" and userSelected:
         for i in options2.get(0, options2.size() - 1):
-            userMapping[i] = input.get('1.0', 'end-1c')
+            userMapping[i] = input.get("1.0", "end-1c")
         actorsList = []
         for i in options.get(0, options.size() - 1):
             actorsList.append(i)
         window.destroy()
     elif fieldIsEmpty:
-        messagebox.showerror('Error', fieldIsEmpty)
+        messagebox.showerror("Error", fieldIsEmpty)
 
     if not inputExists and not userSelected:
-        answer = askyesno(title='confirmation', message='Are you sure that you finished grouping users?')
+        answer = askyesno(
+            title="confirmation",
+            message="Are you sure that you finished grouping users?",
+        )
         if answer:
             loop = False
             window.destroy()
 
 
 def moveElementFormOneBoxToOther(fromBox: tk.Listbox, toBox: tk.Listbox):
-    for i in fromBox.curselection():    
+    for i in fromBox.curselection():
         toBox.insert(i, fromBox.get(i))
         fromBox.delete(i)
 
@@ -342,14 +494,19 @@ def interactionMapper(interaction):
 
 def getActorsList(touchPoints):
     print(touchPoints.columns)
-    initiator = touchPoints.columns.get_loc('Actor who initiated' )
-    receiver = touchPoints.columns.get_loc('Actor who received')
-    actorsList = touchPoints.iloc[ :, initiator].drop_duplicates().tolist()
-    actorsList = actorsList + touchPoints.iloc[ :, receiver ].drop_duplicates().tolist()
+    initiator = touchPoints.columns.get_loc("Actor who initiated")
+    receiver = touchPoints.columns.get_loc("Actor who received")
+    actorsList = touchPoints.iloc[:, initiator].drop_duplicates().tolist()
+    del actorsList[0]
+    actorsList2 = touchPoints.iloc[:, receiver].drop_duplicates().tolist()
+    del actorsList2[0]
+    actorsList = actorsList + actorsList2
     options = []
     for element in actorsList:
-        if(not pd.isna(element)):
-            if str.capitalize(str.lower(element)) not in options and not (str.isspace(element)):
+        if not pd.isna(element):
+            if str.capitalize(str.lower(element)) not in options and not (
+                str.isspace(element)
+            ):
                 options.append(str.capitalize(str.lower(element)))
     return options
 
@@ -361,7 +518,9 @@ def parseTouchPoint(line, mapping):
     else:
         touchPoint = cjml.ActualCommunicationPoint()
         receiver = cjml.Receiver()
-        receiver.refersTo = mapping[str.capitalize(str.lower(line["Actor who received"]))]
+        receiver.refersTo = mapping[
+            str.capitalize(str.lower(line["Actor who received"]))
+        ]
         receiver.receiversLabel = line["Receiver's label"]
         touchPoint.receiver = receiver
 
@@ -386,7 +545,9 @@ def parseTouchPoint(line, mapping):
     if not pd.isnull((line["UX description"])):
         touchPoint.touchPointExperience.experienceDescription = line[12]
     if not pd.isnull(line["UX rating"]):
-        touchPoint.touchPointExperience.expienceRating = convertExperienceToGrade(line["UX rating"])
+        touchPoint.touchPointExperience.expienceRating = convertExperienceToGrade(
+            line["UX rating"]
+        )
 
     touchPoint.Devation = checkDevationFlag(line["Deviation"])
     if not (pd.isnull(line["Date"])):
@@ -395,7 +556,9 @@ def parseTouchPoint(line, mapping):
         if pd.isnull(line["Time"]):
             time.timeCompleted = handledDate
         else:
-            time.timeCompleted = handledDate.combine(handledDate, line["Time"]) # issues
+            time.timeCompleted = handledDate.combine(
+                handledDate, line["Time"]
+            )  # issues
 
         touchPoint.timestamps = time
 
@@ -428,18 +591,24 @@ def extractJourneyInfo(dataframe, index):
 
     actualJourney = cjml.ActualJourney()
     actualJourney.journeyID = index
-    actualJourney.journeyShortSummary = head.iloc[4, 3]
-    actualJourney.journeyStatus = head.iloc[3, 3]
+    actualJourney.journeyShortSummary = head.iloc[3, 3]
+    actualJourney.journeyStatus = head.iloc[2, 3]
+    actualJourney.creator = head.iloc[4, 3]
     return actualJourney
 
 
 def getFileLocation():
     try:
-        file = filedialog.askopenfile(mode='r', filetypes=[('Excel', '*.xlsm  *.xlsx')]) # handle the exception
+        file = filedialog.askopenfile(
+            mode="r", filetypes=[("Excel", "*.xlsm  *.xlsx")]
+        )  # handle the exception
         if file:
             filepath = os.path.abspath(file.name)
     except Exception:
-        messagebox.showerror('Python Error', 'The application could not read the file. If it is opened using Excel, please close it and retry again')
+        messagebox.showerror(
+            "Python Error",
+            "The application could not read the file. If it is opened using Excel, please close it and retry again",
+        )
         filepath = getFileLocation()
     return filepath
 
