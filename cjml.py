@@ -162,6 +162,7 @@ class TouchPoint:
     def __init__(self):
         self.TouchPointID =""
         self.uncertinty = ""
+        self.category = ""
 
 
 class ActualTouchPoint(TouchPoint):

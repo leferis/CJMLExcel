@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+from tkinter.ttk import Scrollbar
 from dateutil import parser
 import tkinter as tk
 from tkinter import filedialog
@@ -9,7 +10,7 @@ import numpy as np
 from tkinter import messagebox
 from tkinter.messagebox import askyesno
 from dragAndDrop import Drag_and_Drop_Listbox
-#from icons import IconSelect
+from icons import IconSelect
 from meniu import Meniu
 
 
@@ -33,19 +34,19 @@ def checkifCreatorProvided(dataframe: pd.DataFrame):
 
 
 def dropCreatorProvided(dataframe: pd.DataFrame):
-    return dataframe.drop(axis=0, index=[6])
+    return dataframe.drop(axis=0, index=[7])
 
 
 def showSheetWindow(excelFile, sheet):
     global actorsList
     if goFoward:
         dataFrame = pd.read_excel(excelFile, sheet_name=sheet)
-        touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5])
+        touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5, 6])
         if checkifCreatorProvided(touchPoints) is True:
             touchPoints = dropCreatorProvided(touchPoints)
-            touchPoints.rename(columns=stripSeries(dataFrame.iloc[5]), inplace=True)
-        else:
             touchPoints.rename(columns=stripSeries(dataFrame.iloc[6]), inplace=True)
+        else:
+            touchPoints.rename(columns=stripSeries(dataFrame.iloc[7]), inplace=True)
         actorsList = getActorsList(touchPoints)
 
 
@@ -139,17 +140,18 @@ def readExcel(filePath):
             if not str.capitalize(str.lower(dataFrame["Unnamed: 3"][0])) in actorsList:
                 error(sheet)
                 return
-            touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5]).dropna(
+            touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5, 6]).dropna(
                 how="all"
             )
-            # if action == "icons" or action == "sort":
-            #     IconSelect(userMapping)
+            if action == "icons" or action == "sort":
+                IconSelect(userMapping)
             if checkifCreatorProvided(touchPoints) is False:
                 touchPoints = dropCreatorProvided(touchPoints)
-                touchPoints.rename(columns=stripSeries(dataFrame.iloc[6]), inplace=True)
+                touchPoints.rename(columns=stripSeries(dataFrame.iloc[7]), inplace=True)
             else:
-                touchPoints.rename(columns=stripSeries(dataFrame.iloc[5]), inplace=True)
+                touchPoints.rename(columns=stripSeries(dataFrame.iloc[6]), inplace=True)
             journey = extractJourneyInfo(dataFrame, id)
+            print(touchPoints.columns)
             initiator = touchPoints.columns.get_loc("Actor who initiated")
             receiver = touchPoints.columns.get_loc("Actor who received")
             tclist = np.array(
@@ -255,13 +257,14 @@ def organizeUsers(sheet):
     label = tk.Label(
         window, text="Please provide user name when grouping", font=("Arial", 14)
     )
-    label.grid(row=0, columnspan=3, column=0)
+    label.grid(row=0, columnspan=4, column=0)
 
     labelName = tk.Label(window, text="User generic name:")
-    labelName.grid(row=1, columnspan=3, sticky="nsew")
-    frame = tk.Frame(window)
+    labelName.grid(row=1, columnspan=4, sticky="nsew")
+    frame = tk.Frame(window, width=20, height=20)
+
     text = tk.Text(window, height=1)
-    text.grid(row=2, columnspan=3, sticky="nsew", padx=50, pady=10)
+    text.grid(row=2, columnspan=2, sticky="nsew", padx=50, pady=10)
 
     options, options2 = createBoxes(window, frame, 3)
 
@@ -269,7 +272,7 @@ def organizeUsers(sheet):
         if str.capitalize(str.lower(str(sheet))) not in options.get(0, options.size()):
             options.insert(index, sheet)
 
-    frame.grid(row=3, column=1, padx=(20, 20), sticky="nsew", columnspan=1)
+    frame.grid(row=3, column=1, sticky="nsew")
 
     b = tk.Button(
         window,
@@ -347,9 +350,16 @@ def selectSheets(sheets):
 
 
 def createBoxes(window, frame, rowLocation):
-    options = tk.Listbox(window)
+    options = tk.Listbox(window, height=30, width=30)
+    scrollbar1 = Scrollbar(window, orient=tk.VERTICAL)
+    options.config(yscrollcommand=scrollbar1.set)
+    scrollbar1.config(command=options.yview)
 
-    options2 = tk.Listbox(window)
+    options2 = tk.Listbox(window, height=30, width=30)
+    scrollbar2 = Scrollbar(window, orient=tk.VERTICAL)
+    options2.config(yscrollcommand=scrollbar2.set)
+    scrollbar2.config(command=options2.yview)
+
     moveToRight = tk.Button(
         frame,
         text="→",
@@ -373,8 +383,10 @@ def createBoxes(window, frame, rowLocation):
         "<Double-1>", lambda x: moveElementFormOneBoxToOther(options2, options)
     )
 
-    options.grid(row=rowLocation, column=0, sticky="nsew", padx=10, pady=10)
-    options2.grid(row=rowLocation, column=2, sticky="nsew", padx=10, pady=10)
+    options.grid(row=rowLocation, column=0, sticky="nsew", columnspan=1)
+    scrollbar1.grid(row=rowLocation, column=1, sticky="nsw")
+    options2.grid(row=rowLocation, column=3, sticky="nsew", columnspan=1)
+    scrollbar2.grid(row=rowLocation, column=4, sticky="nsw")
     return options, options2
 
 
@@ -493,7 +505,6 @@ def interactionMapper(interaction):
 
 
 def getActorsList(touchPoints):
-    print(touchPoints.columns)
     initiator = touchPoints.columns.get_loc("Actor who initiated")
     receiver = touchPoints.columns.get_loc("Actor who received")
     actorsList = touchPoints.iloc[:, initiator].drop_duplicates().tolist()
@@ -535,6 +546,9 @@ def parseTouchPoint(line, mapping):
     initiator.initatorLabel = line["Initiator's label"]
 
     touchPoint.initiator = initiator
+
+    if not pd.isnull((line["Touchpoint category"])):
+        touchPoint.category = line["Touchpoint category"]
 
     if not pd.isnull((line["Phase"])):
         phase = line["Phase"]
@@ -587,13 +601,13 @@ def handleDate(field):
 
 
 def extractJourneyInfo(dataframe, index):
-    head = dataframe.head(5)
-
+    head = dataframe.head(7)
     actualJourney = cjml.ActualJourney()
     actualJourney.journeyID = index
-    actualJourney.journeyShortSummary = head.iloc[3, 3]
-    actualJourney.journeyStatus = head.iloc[2, 3]
-    actualJourney.creator = head.iloc[4, 3]
+    actualJourney.journeyShortSummary = head.iloc[4, 3]
+    actualJourney.journeyLongSummary = head.iloc[5, 3]
+    actualJourney.journeyStatus = head.iloc[3, 3]
+    actualJourney.creator = head.iloc[6, 3]
     return actualJourney
 
 

@@ -32,12 +32,11 @@ class Meniu:
             master=root,
             command=lambda: close(change_variable, "skip", root),
         )
-        text.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-        skip.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        text.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
         group.grid(row=1, column=1, sticky="nsew", padx=10, pady=10)
-        # icons.grid(row=1, column=1, sticky="nsew", padx=10, pady=10)
-        sort.grid(row=1, column=2, sticky="nsew", padx=10, pady=10)
-        # skip.grid(row=2, column=0, sticky="nsew", padx=10, pady=10, columnspan=3)
+        icons.grid(row=1, column=2, sticky="nsew", padx=10, pady=10)
+        sort.grid(row=1, column=3, sticky="nsew", padx=10, pady=10)
+        skip.grid(row=2, column=0, sticky="nsew", padx=10, pady=10, columnspan=4)
         root.protocol("WM_DELETE_WINDOW", lambda: on_closing(root))
         root.lift()
         root.focus_force()
