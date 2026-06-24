@@ -30,23 +30,86 @@ Icons = []
 
 
 def checkifCreatorProvided(dataframe: pd.DataFrame):
+    print(dataframe.head(1))
     return dataframe.head(1).iloc[0, 0] in ["Yes", "No", np.nan]
 
-
 def dropCreatorProvided(dataframe: pd.DataFrame):
-    return dataframe.drop(axis=0, index=[7])
+    if dataframe.empty:
+        return dataframe
+    first_index = dataframe.index[0]
+    return dataframe.drop(axis=0, index=[first_index])
 
+
+def normalize_column_name(name):
+    if isinstance(name, str):
+        return name.strip()
+    return name
+
+
+def normalize_columns(dataFrame: pd.DataFrame):
+    dataFrame.columns = [normalize_column_name(col) for col in dataFrame.columns]
+    return dataFrame
+
+
+def get_missing_columns(dataFrame: pd.DataFrame, expected_columns):
+    return [col for col in expected_columns if col not in dataFrame.columns]
+
+
+def find_header_row(dataFrame: pd.DataFrame, candidate_rows=None):
+    if candidate_rows is None:
+        candidate_rows = range(5, min(len(dataFrame), 12))
+    expected = {"actor who initiated", "actor who received"}
+    for row_idx in candidate_rows:
+        row = dataFrame.iloc[row_idx]
+        normalized_values = [
+            normalize_column_name(value).lower()
+            if isinstance(value, str)
+            else value
+            for value in row.values
+        ]
+        if expected.issubset(set(normalized_values)):
+            return row_idx, stripSeries(row)
+    return None, None
+
+
+def build_touchpoints(dataFrame: pd.DataFrame):
+    header_idx, header_row = find_header_row(dataFrame)
+    if header_idx is None:
+        raise ValueError(
+            "Unable to locate the touchpoint header row. "
+            "Please verify that the Excel sheet contains the expected columns "
+            "such as 'Actor who initiated' and 'Actor who received'."
+        )
+
+    touchPoints = dataFrame.drop(axis=0, index=list(range(header_idx + 1)))
+    if checkifCreatorProvided(touchPoints):
+        touchPoints = dropCreatorProvided(touchPoints)
+
+    touchPoints.rename(columns=stripSeries(header_row), inplace=True)
+    normalize_columns(touchPoints)
+
+    missing = get_missing_columns(
+        touchPoints, ["Actor who initiated", "Actor who received"]
+    )
+    if missing:
+        raise KeyError(
+            f"Required columns are missing after header extraction: {missing}. "
+            f"Found columns: {touchPoints.columns.tolist()}"
+        )
+    return touchPoints
+
+
+def checkIfLongJourneyExists(touchpoints):
+    print(touchpoints)
+    return True
 
 def showSheetWindow(excelFile, sheet):
     global actorsList
+
     if goFoward:
         dataFrame = pd.read_excel(excelFile, sheet_name=sheet)
-        touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5, 6])
-        if checkifCreatorProvided(touchPoints) is True:
-            touchPoints = dropCreatorProvided(touchPoints)
-            touchPoints.rename(columns=stripSeries(dataFrame.iloc[6]), inplace=True)
-        else:
-            touchPoints.rename(columns=stripSeries(dataFrame.iloc[7]), inplace=True)
+        print(dataFrame)
+        touchPoints = build_touchpoints(dataFrame)
         actorsList = getActorsList(touchPoints)
 
 
@@ -140,16 +203,10 @@ def readExcel(filePath):
             if not str.capitalize(str.lower(dataFrame["Unnamed: 3"][0])) in actorsList:
                 error(sheet)
                 return
-            touchPoints = dataFrame.drop(axis=0, index=[0, 1, 2, 3, 4, 5, 6]).dropna(
-                how="all"
-            )
+            touchPoints = build_touchpoints(dataFrame).dropna(how="all")
             if action == "icons" or action == "sort":
                 IconSelect(userMapping)
-            if checkifCreatorProvided(touchPoints) is False:
-                touchPoints = dropCreatorProvided(touchPoints)
-                touchPoints.rename(columns=stripSeries(dataFrame.iloc[7]), inplace=True)
-            else:
-                touchPoints.rename(columns=stripSeries(dataFrame.iloc[6]), inplace=True)
+            rows = 0
             journey = extractJourneyInfo(dataFrame, id)
             print(touchPoints.columns)
             initiator = touchPoints.columns.get_loc("Actor who initiated")
@@ -505,6 +562,15 @@ def interactionMapper(interaction):
 
 
 def getActorsList(touchPoints):
+    print(touchPoints)
+    required_columns = ["Actor who initiated", "Actor who received"]
+    missing = get_missing_columns(touchPoints, required_columns)
+    if missing:
+        raise KeyError(
+            f"Required touchpoint columns are missing: {missing}. "
+            f"Available columns: {touchPoints.columns.tolist()}"
+        )
+
     initiator = touchPoints.columns.get_loc("Actor who initiated")
     receiver = touchPoints.columns.get_loc("Actor who received")
     actorsList = touchPoints.iloc[:, initiator].drop_duplicates().tolist()
@@ -547,7 +613,7 @@ def parseTouchPoint(line, mapping):
 
     touchPoint.initiator = initiator
 
-    if not pd.isnull((line["Touchpoint category"])):
+    if "Touchpoint category" in line and not pd.isnull((line["Touchpoint category"])):
         touchPoint.category = line["Touchpoint category"]
 
     if not pd.isnull((line["Phase"])):
@@ -602,8 +668,10 @@ def handleDate(field):
 
 def extractJourneyInfo(dataframe, index):
     head = dataframe.head(7)
+    print(head)
     actualJourney = cjml.ActualJourney()
     actualJourney.journeyID = index
+    actualJourney.journeyEndUserType = head.iloc[2, 3]
     actualJourney.journeyShortSummary = head.iloc[4, 3]
     actualJourney.journeyLongSummary = head.iloc[5, 3]
     actualJourney.journeyStatus = head.iloc[3, 3]

@@ -31,6 +31,7 @@ class Journey:
         self.journeyLongSummary = ""
         self.journeyPhase = JourneyPhase()
         self.journeyOperators = ""
+        self.journeyEndUserType = ""
         self.creator = ""
 
 class JourneyPhase:
@@ -203,6 +204,8 @@ class ActualAction(ActualTouchPoint):
         print(hasattr(self, 'touchPointExperience'))
         if hasattr(self, 'touchPointExperience'):
             action += self.touchpointExperience.toXML()
+        if hasattr(self, 'category'):
+            action += "<category>{0}</category>\n".format(self.category)
         action += "</actualAction>\n"
         return action
 
@@ -245,6 +248,8 @@ class ActualCommunicationPoint(ActualTouchPoint):
         communicationPoint += self.timestamps.toXML()
         if hasattr(self, 'touchPointExperience'):
             communicationPoint += self.touchPointExperience.toXML()
+        if hasattr(self, 'category'):
+            communicationPoint += "<category>{0}</category>\n".format(self.category)
         communicationPoint += "</actualCommunicationPoint>\n"
         return communicationPoint
 
