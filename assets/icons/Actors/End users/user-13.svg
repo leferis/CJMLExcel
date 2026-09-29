@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 72 94" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:square;stroke-miterlimit:1.5;">
+    <g id="female_4_with-clothes" serif:id="female_4_with clothes" transform="matrix(4.03837,0,0,4.03837,0.840549,-0.211328)">
+        <g transform="matrix(0.233437,0,0,0.259672,0.327838,-1.89977)">
+            <path d="M0.098,94.668L0.098,74.631C0.098,64.759 9.013,56.745 19.994,56.745L22.334,56.745C25.859,59.623 30.539,61.377 35.671,61.377C40.803,61.377 45.483,59.623 49.008,56.745L51.744,56.745C62.725,56.745 71.64,64.759 71.64,74.631L71.64,94.585" style="fill:none;stroke:black;stroke-width:4.51px;"/>
+        </g>
+        <g transform="matrix(0.247624,0,0,0.247624,-0.197584,-0.83975)">
+            <path d="M19.253,50.221L1.161,50.178L15.538,17.355C18.823,9.299 26.733,3.613 35.962,3.603C45.19,3.613 53.1,9.299 56.385,17.355L70.762,50.178L52.229,50.222C53.648,47.586 54.454,44.571 54.454,41.37L54.454,22.407L17.028,22.407L17.028,41.37C17.028,44.571 17.834,47.585 19.253,50.221Z"/>
+        </g>
+        <g transform="matrix(-0.129539,-1.5864e-17,3.19394e-17,-0.260805,13.2993,28.8376)">
+            <path d="M71.64,74.512C71.64,64.706 55.612,56.745 35.869,56.745C16.127,56.745 0.098,64.706 0.098,74.512L0.098,92.516L71.64,92.516L71.64,74.512Z" style="fill:none;stroke:black;stroke-width:5.41px;stroke-linecap:round;"/>
+        </g>
+        <g transform="matrix(-0.30153,-3.69268e-17,2.33545e-17,-0.190704,20.5882,26.2881)">
+            <path d="M25.323,69.926C29.265,61.478 34.06,51.198 36.921,45.066C37.507,43.81 38.435,43.068 39.423,43.068C40.41,43.068 41.339,43.81 41.925,45.066C44.851,51.337 49.8,61.947 53.789,70.499" style="fill:none;stroke:black;stroke-width:2.94px;stroke-linecap:round;"/>
+        </g>
+    </g>
+</svg>

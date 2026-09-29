@@ -14,7 +14,7 @@ class CJML:
         if not (self.user != ""):
             text += " produced by: " + self.user
         text += " -->\n"
-        text += "<CJML version=\"2.0\">\n"
+        text += "<CJML version=\"3.0\">\n"
         for planed in self.plannedJourney:
             text += planed.toXML()
         for actual in self.ActualJourney:
@@ -29,6 +29,7 @@ class Journey:
         self.journeyTitle = ""
         self.journeyShortSummary = ""
         self.journeyLongSummary = ""
+        self.journeyStartDate = ""
         self.journeyPhase = JourneyPhase()
         self.journeyOperators = ""
         self.journeyEndUserType = ""
@@ -103,6 +104,23 @@ class ActualJourney(Journey):
     def addActor(self, actor):
         self.actors = self.actors + actor
 
+    def get_end_user_node_name(self):
+        if not self.journeyEndUserType:
+            return "endUser"
+
+        normalized_type = str(self.journeyEndUserType).strip().lower()
+        mapping = {
+            "customer": "customer",
+            "user": "user",
+            "employee": "employee",
+            "patient": "patient",
+            "citizen": "citizen",
+            "end user": "endUser",
+            "end-user": "endUser",
+            "enduser": "endUser",
+        }
+        return mapping.get(normalized_type, "endUser")
+
     def sortActors(self, endUser):
         endUsers = []
         otherActors = []
@@ -122,9 +140,11 @@ class ActualJourney(Journey):
 
     def toXML(self, endUser):
         self.sortActors(endUser)
+        end_user_node_name = self.get_end_user_node_name()
         test = "<actualJourney>\n"
         test += "<journeyID>AJ{0}</journeyID>\n".format(self.journeyID)
         test += "<journeyTitle>{0}</journeyTitle>\n".format(self.journeyTitle) if self.journeyTitle != "" else ""
+        test += "<journeyStartDate>{0}</journeyStartDate>\n".format(self.journeyStartDate) if self.journeyStartDate != "" else ""
         test += "<plannedReference>PJ1</plannedReference>" # delete later
         if len(self.Phases) > 0:
             test += "<journeyPhases>\n"
@@ -143,7 +163,7 @@ class ActualJourney(Journey):
             if actor in endUser:
                 if len(actor) == 2:
                     userList = "<!-- {0} -->\n".format(actor[1]) + userList
-                userList = "<endUser actorID =\"{0}\"/>\n".format(actor[0] if len(actor) == 2 else actor) + userList
+                userList = "<{0} actorID =\"{1}\"/>\n".format(end_user_node_name, actor[0] if len(actor) == 2 else actor) + userList
             else:
                 if len(actor) == 2:
                     userList = userList + "<!-- {0} -->\n".format(actor[1])

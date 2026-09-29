@@ -30,12 +30,21 @@ Icons = []
 
 
 def checkifCreatorProvided(dataframe: pd.DataFrame):
-    print(dataframe.head(1))
-    return dataframe.head(1).iloc[0, 0] in ["Yes", "No", np.nan]
+    # Only treat an explicit "Yes" or "No" (case-insensitive) in the
+    # first cell as the creator-provided indicator. Do NOT treat NaN or
+    # empty cells as a trigger to drop the first data row — that causes
+    # the real first touchpoint to be skipped when sheets vary.
+    if dataframe.empty:
+        return False
+    first_val = dataframe.iat[0, 0]
+    if isinstance(first_val, str):
+        return first_val.strip().lower() in ("yes", "no")
+    return False
 
 def dropCreatorProvided(dataframe: pd.DataFrame):
     if dataframe.empty:
         return dataframe
+    # Only drop the first row (creator-provided metadata) when it's present.
     first_index = dataframe.index[0]
     return dataframe.drop(axis=0, index=[first_index])
 
@@ -588,6 +597,10 @@ def getActorsList(touchPoints):
     return options
 
 
+def field_has_value(line, field):
+    return field in line and not pd.isnull(line[field])
+
+
 def parseTouchPoint(line, mapping):
     global endUser
     if pd.isnull((line["Actor who received"])):
@@ -598,13 +611,14 @@ def parseTouchPoint(line, mapping):
         receiver.refersTo = mapping[
             str.capitalize(str.lower(line["Actor who received"]))
         ]
-        receiver.receiversLabel = line["Receiver's label"]
+        if "Receiver's label" in line:
+            receiver.receiversLabel = line["Receiver's label"]
         touchPoint.receiver = receiver
 
     touchPoint.TouchPointID = line["TP ID"]
-    if not (pd.isnull(line["Channel"])):
+    if field_has_value(line, "Channel"):
         touchPoint.chanell = interactionMapper(line["Channel"])
-    if not (pd.isnull(line["Comment"])):
+    if field_has_value(line, "Comment"):
         touchPoint.comment = line["Comment"]
 
     initiator = cjml.Initiator()
@@ -613,32 +627,32 @@ def parseTouchPoint(line, mapping):
 
     touchPoint.initiator = initiator
 
-    if "Touchpoint category" in line and not pd.isnull((line["Touchpoint category"])):
+    if field_has_value(line, "Touchpoint category"):
         touchPoint.category = line["Touchpoint category"]
 
-    if not pd.isnull((line["Phase"])):
+    if field_has_value(line, "Phase"):
         phase = line["Phase"]
         PhaseList.append(phase)
         touchPoint.phase = phase
-    if not pd.isnull((line["UX description"])) or not pd.isnull((line["UX rating"])):
+    if field_has_value(line, "UX description") or field_has_value(line, "UX rating"):
         touchPoint.touchPointExperience = cjml.EndUserExperience()
-    if not pd.isnull((line["UX description"])):
+    if field_has_value(line, "UX description"):
         touchPoint.touchPointExperience.experienceDescription = line[12]
-    if not pd.isnull(line["UX rating"]):
+    if field_has_value(line, "UX rating"):
         touchPoint.touchPointExperience.expienceRating = convertExperienceToGrade(
             line["UX rating"]
         )
 
-    touchPoint.Devation = checkDevationFlag(line["Deviation"])
-    if not (pd.isnull(line["Date"])):
+    touchPoint.Devation = checkDevationFlag(line["Deviation"]) if "Deviation" in line else False
+    if field_has_value(line, "Date"):
         time = cjml.timeStamps()
         handledDate = handleDate(line["Date"])
-        if pd.isnull(line["Time"]):
-            time.timeCompleted = handledDate
-        else:
+        if field_has_value(line, "Time"):
             time.timeCompleted = handledDate.combine(
                 handledDate, line["Time"]
-            )  # issues
+            )
+        else:
+            time.timeCompleted = handledDate
 
         touchPoint.timestamps = time
 
@@ -659,6 +673,55 @@ def convertExperienceToGrade(text):
             return 1
 
 
+def extract_journey_end_user_type(dataframe):
+    head = dataframe.head(20)
+
+    def normalize_value(value):
+        if pd.isna(value):
+            return ""
+        if isinstance(value, str):
+            value = value.strip()
+            return value
+        return str(value)
+
+    def is_known_end_user_type(value):
+        normalized_value = normalize_value(value).lower()
+        return normalized_value in {
+            "customer",
+            "user",
+            "employee",
+            "patient",
+            "citizen",
+            "end user",
+            "end-user",
+            "enduser",
+        }
+
+    for row_idx in range(len(head)):
+        for col_idx in range(len(head.columns)):
+            cell_value = normalize_value(head.iloc[row_idx, col_idx])
+            normalized_label = normalize_column_name(cell_value).lower()
+            if normalized_label in {
+                "end-user type",
+                "end user type",
+                "endusertype",
+                "journeyendusertype",
+                "journey end user type",
+            }:
+                for candidate_idx in range(col_idx + 1, len(head.columns)):
+                    candidate = normalize_value(head.iloc[row_idx, candidate_idx])
+                    if is_known_end_user_type(candidate):
+                        return candidate
+
+    for row_idx in range(len(head)):
+        for col_idx in range(len(head.columns)):
+            candidate = normalize_value(head.iloc[row_idx, col_idx])
+            if is_known_end_user_type(candidate):
+                return candidate
+
+    return ""
+
+
 def handleDate(field):
     date = field
     if type(field) is str:
@@ -666,16 +729,47 @@ def handleDate(field):
     return date
 
 
+def extract_metadata_value(dataframe, label):
+    normalized_label = label.strip().lower()
+    for row_idx in range(min(len(dataframe), 7)):
+        for col_idx in range(len(dataframe.columns)):
+            cell = dataframe.iloc[row_idx, col_idx]
+            cell = "" if pd.isna(cell) else cell
+            if isinstance(cell, str) and cell.strip().lower() == normalized_label:
+                for value_idx in range(col_idx + 1, len(dataframe.columns)):
+                    value = dataframe.iloc[row_idx, value_idx]
+                    value = "" if pd.isna(value) else value
+                    if value not in ("", None):
+                        return value
+    return ""
+
+
 def extractJourneyInfo(dataframe, index):
     head = dataframe.head(7)
     print(head)
     actualJourney = cjml.ActualJourney()
     actualJourney.journeyID = index
-    actualJourney.journeyEndUserType = head.iloc[2, 3]
-    actualJourney.journeyShortSummary = head.iloc[4, 3]
-    actualJourney.journeyLongSummary = head.iloc[5, 3]
-    actualJourney.journeyStatus = head.iloc[3, 3]
-    actualJourney.creator = head.iloc[6, 3]
+    title = head.iloc[0, 3]
+    first_column_value = normalize_column_name(dataframe.columns[0])
+    first_column = first_column_value.lower()
+    first_cell = normalize_column_name(head.iloc[0, 0]).lower()
+    if first_cell in {"end-user name", "end-user id"} and not first_column.startswith(
+        "unnamed:"
+    ):
+        title = first_column_value
+    if pd.isna(title):
+        title = head.iloc[0, 0]
+        if normalize_column_name(title).lower() == "journey title":
+            title = ""
+    actualJourney.journeyTitle = "" if pd.isna(title) else title
+    actualJourney.journeyEndUserType = extract_journey_end_user_type(dataframe)
+    actualJourney.journeyStartDate = extract_metadata_value(
+        dataframe, "Start of journey"
+    )
+    actualJourney.journeyShortSummary = head.iloc[3, 3]
+    actualJourney.journeyLongSummary = head.iloc[4, 3]
+    actualJourney.journeyStatus = head.iloc[2, 3]
+    actualJourney.creator = head.iloc[5, 3]
     return actualJourney
 
 
